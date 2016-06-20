@@ -95,6 +95,18 @@ class DataManager:
 
         self.indexesManager.loadHSIDailyFromFile()
 
+    def indexesHSIDailyQueryByDate(self, startdate, enddate):
+
+        return self.indexesManager.queryHSIDaily(startdate, enddate)
+
+    def indexesHSIDailyAnaQueryByDate(self, startdate, enddate):
+
+        return self.indexesManager.queryHSIDailyAna(startdate, enddate)
+
+    def indexesHSIDailyAnaStore(self, anaDataFrame):
+
+        self.indexesManager.storeHSIDailyAna(anaDataFrame)
+
 if __name__ == "__main__":
 
     dm = DataManager()
@@ -104,9 +116,11 @@ if __name__ == "__main__":
     mysql_localhost_root = config['accounts']['databases']["mysql_localhost_root"]
     path = config['filepath']['root'] + config['filepath']['data']
 
-    dm.setManager(path, mysql_host, 
+    dm.setManager(path, mysql_host,
                   mysql_localhost_root["username"],
                   mysql_localhost_root["password"])
 
+    # load static HSI daily data
     dm.indexesHSIDailyLoadStaticFile()
 
+    #print dm.indexesHSIDailyQueryByDate('2015-01-01', '2015-12-31')

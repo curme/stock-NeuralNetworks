@@ -7,6 +7,10 @@
 out/
 local.properties
 
+# python #
+##########
+*.pyc
+
 # Generic Android ignores #
 ###########################
 bin/
@@ -89,3 +93,4 @@ DerivedData
 # configure #
 #############
 *.config
+config.py

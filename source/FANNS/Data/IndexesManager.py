@@ -1,4 +1,5 @@
 import os
+import pandas
 
 class IndexesManager:
 
@@ -49,12 +50,76 @@ class IndexesManager:
         self.cursor.execute(sql)
         self.conn.commit()
 
-    def readHSIDaily(self):
+    def queryHSIDaily(self, startdate, enddate):
 
-        pass
+        startdate  = startdate.strftime('%Y-%m-%d')
+        enddate    =   enddate.strftime('%Y-%m-%d')
+        conditions = "date >= '%s' AND date <= '%s'" % (startdate, enddate)
+        result = self.queryInDataFrame("Indexes", "HSIDaily", conditions)
+        return result
 
-    def storeHSIDailyLabels(self):
+    def queryHSIDailyAna(self, startdate, enddate):
 
-        pass
+        startdate  = startdate.strftime('%Y-%m-%d')
+        enddate    =   enddate.strftime('%Y-%m-%d')
+        conditions = "date >= '%s' AND date <= '%s'" % (startdate, enddate)
+        result = self.queryInDataFrame("Indexes", "HSIDailyAna", conditions)
+        return result
 
+    def storeHSIDailyAna(self, dataFrame):
 
+        if dataFrame.empty: return
+
+        datelist = list(dataFrame['date'])
+        datelist.sort()
+        startdate= datelist[ 0].strftime('%Y-%m-%d')
+        enddate  = datelist[-1].strftime('%Y-%m-%d')
+
+        sql = "DELETE FROM Indexes.HSIDailyAna WHERE date>='%s' and date<='%s';" % (startdate, enddate)
+        self.cursor.execute(sql)
+        self.conn.commit()
+
+        sql = "INSERT INTO Indexes.HSIDailyAna " + \
+              "(date,            close_change_1d, close_change_2d, " + \
+              " close_change_3d, close_change_4d, close_change_5d, " + \
+              " close_change_6d, close_change_7d, close_change_8d, " + \
+              " close_change_9d, close_change_10d,status) VALUES "
+        for date in datelist:
+            data = dataFrame.loc[dataFrame.date==date]
+            tmp  = "('%s',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'%s')," % \
+                    (date.strftime('%Y-%m-%d'), str(float(data['close_change_1d'])), \
+                    str(float(data['close_change_2d'])),str(float(data['close_change_3d'])), \
+                    str(float(data['close_change_4d'])),str(float(data['close_change_5d'])), \
+                    str(float(data['close_change_6d'])),str(float(data['close_change_7d'])), \
+                    str(float(data['close_change_8d'])),str(float(data['close_change_9d'])), \
+                    str(float(data['close_change_10d'])),data['status'].min())
+            sql += tmp
+        sql = sql[:-1]+";"
+        self.cursor.execute(sql)
+        self.conn.commit()
+
+    def queryInDataFrame(self, database, table, conditions=None):
+
+        # get columns
+        sql = "SHOW COLUMNS FROM %s.%s;" % (database, table)
+        self.cursor.execute(sql)
+        columns = self.cursor.fetchall()
+        columns = [item[0] for item in columns]
+
+        # query data in table
+        sql = "SELECT * FROM %s.%s" % (database, table)
+        if not conditions == None: sql += " WHERE %s" % conditions
+        sql += ';'
+        self.cursor.execute(sql)
+        data = self.cursor.fetchall()
+
+        # convert columns and data into dictionary
+        result = {}
+        for key in columns: result[key] = []
+        for row in data:
+            for i, item in zip(range(len(row)), row):
+                result[columns[i]].append(item)
+        result.pop('id')
+
+        # convert dictionary into pandas DF and return
+        return pandas.DataFrame.from_dict(result)
