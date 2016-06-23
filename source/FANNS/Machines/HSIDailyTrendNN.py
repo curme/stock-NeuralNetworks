@@ -9,7 +9,10 @@ class HSIDailyTrendNNManager:
 
     def __init__(self):
 
-        self.model       = None
+        print "Info: ", "Create empty HSI Daily Predict NN"
+
+        self.name        = "HSI Daily Trend Predict NN"
+        self.model       = {}
         self.status      = 0    # 0 for nothing done; 1 for data processed
         self.dataManager = None
         self.Xtrain      = None
@@ -21,64 +24,64 @@ class HSIDailyTrendNNManager:
         self.modelSDate  = None
         self.modelEDate  = None
 
+        print "Info: ", self.name
+
     def setManager(self, dataManager = None, modelSDate = None, \
                          modelEDate  = None, status     = None, \
                          Xtrain      = None, ytrain     = None, \
                          Xval        = None, yval       = None, \
-                         Xtest       = None, ytest      = None):
+                         Xtest       = None, ytest      = None, \
+                         model       = None):
 
-        ltoa = lambda llist: np.array(llist)
+        print "Info: ", "Set %s" % self.name
 
-        if dataManager: self.dataManager = dataManager
-        if modelSDate : self.modelSDate  = modelSDate
-        if modelEDate : self.modelEDate  = modelEDate
-        if status     : self.status      = status
-        if Xtrain     : self.Xtrain      = ltoa(Xtrain)
-        if ytrain     : self.ytrain      = ltoa(ytrain)
-        if Xval       : self.Xval        = ltoa(Xval)
-        if yval       : self.yval        = ltoa(yval)
-        if Xtest      : self.Xtest       = ltoa(Xtest)
-        if ytest      : self.ytest       = ltoa(ytest)
+        ltoa = lambda llist : np.array(llist)
+        stod = lambda string: datetime.strptime(string , '%Y-%m-%d')
+        dtos = lambda date  : date.strftime('%Y-%m-%d')
+
+        if not dataManager == None : self.dataManager = dataManager
+        if not status      == None : self.status      = status
+        if not Xtrain      == None : self.Xtrain      = ltoa(Xtrain)
+        if not ytrain      == None : self.ytrain      = ltoa(ytrain)
+        if not Xval        == None : self.Xval        = ltoa(Xval)
+        if not yval        == None : self.yval        = ltoa(yval)
+        if not Xtest       == None : self.Xtest       = ltoa(Xtest)
+        if not ytest       == None : self.ytest       = ltoa(ytest)
+        if not model       == None : self.model       = model
+
+        if not modelSDate  == None and not self.modelSDate:
+            self.modelSDate = stod(modelSDate)
+        if not modelEDate  == None and not self.modelEDate:
+            self.modelEDate = stod(modelEDate)
+        if not modelSDate  == None and not stod(modelSDate) == self.modelSDate:
+            self.status, self.modelSDate = 0, stod(modelSDate)
+        if not modelEDate  == None and not stod(modelEDate) == self.modelEDate:
+            self.status, self.modelEDate = 0, stod(modelEDate)
+
+        print "Info: ", "Status level %s" % str(self.status)
 
     def process(self):
+
+        print "Info: ", "Run %s" % self.name
 
         self.preprocessData()
         self.divideDataSet()
         self.trainingModel()
-
-    def trainingModel(self):
-
-        X       = tf.placeholder(tf.float32, [None, 75])
-        y_      = tf.placeholder(tf.float32, [None, 5 ])
-        weights = tf.Variable(tf.zeros([75, 5]))
-        bias    = tf.Variable(tf.zeros([5]))
-        y       = tf.nn.softmax(tf.matmul(X, weights) + bias)
-        cross_entropy = tf.reduce_mean(-tf.reduce_sum(y_ * tf.log(y),reduction_indices=[1]))
-        train_step    = tf.train.GradientDescentOptimizer(0.5).minimize(cross_entropy)
-
-        init    = tf.initialize_all_variables()
-        sess    = tf.Session()
-        sess.run(init)
-
-        print "Model training..."
-
-        sess.run(train_step, feed_dict={X: self.Xtrain, y_: self.ytrain})
-
-        correct_prediction = tf.equal(tf.argmax(y,1), tf.argmax(y_,1))
-        accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-        print sess.run(accuracy, feed_dict={X: self.Xval, y_: self.yval})
-        print sess.run(accuracy, feed_dict={X: self.Xtest, y_: self.ytest})
+        #self.evaluate()
 
     # data processing
     def preprocessData(self):
 
+        print "Info: ", "%s, pre process data" % self.name
+
         # if the data has been processed, skip processing
-        if self.status > 0: return "Pre-processing has been done."
+        if self.status > 0: print "Info: ", "Pre-processing has been done."; return
 
         # get raw price data
-        tDelta   = timedelta(days=21)
-        rawSDate = self.modelSDate-tDelta
-        rawEDate = self.modelEDate
+        oneDay   = timedelta(days=1)
+        tDelta   = oneDay * 35
+        rawSDate = self.modelSDate
+        rawEDate = self.modelEDate+tDelta
         raw      = self.dataManager.indexesHSIDailyQueryByDate(rawSDate, rawEDate)
 
         # get ana data
@@ -87,7 +90,6 @@ class HSIDailyTrendNNManager:
         ana      = self.dataManager.indexesHSIDailyAnaQueryByDate(anaSDate, anaEDate)
 
         # calculate changes for each day
-        oneDay = timedelta(days=1)
         for stretch in xrange((anaEDate-anaSDate).days+1):
 
             date = anaSDate + oneDay*stretch
@@ -108,14 +110,14 @@ class HSIDailyTrendNNManager:
             # check every status flag
             rawSlice, i = [raw.loc[raw.date==date.date()]], 1
             while len(rawSlice) <= 10:
-                row = raw.loc[raw.date==(date-oneDay*i).date()]
+                row = raw.loc[raw.date==(date+oneDay*i).date()]
                 if not row.empty: rawSlice.append(row)
                 i += 1
             for fi, flag in [p for p in zip(range(len(flags)), flags) if p[1]=='0']:
                 column = "close_change_%sd" % str(fi+1)
                 cp = float(rawSlice[   0]['close'])
-                bp = float(rawSlice[fi+1]['close'])
-                ana.loc[ana.date==date.date(), column] = math.log(cp/bp)
+                fp = float(rawSlice[fi+1]['close'])
+                ana.loc[ana.date==date.date(), column] = math.log(fp/cp)
                 flags[fi] = '1'
 
             ana.loc[ana.date==date.date(), 'status'] = ''.join(flags)
@@ -128,11 +130,14 @@ class HSIDailyTrendNNManager:
     # divide data sets
     def divideDataSet(self):
 
-        if self.status < 1: return "Pre-processing doesn't been done."
-        if self.status > 1: return "Data sets dividing has been done."
+        print "Info: ", "%s, divide data sets" % self.name
+
+        if self.status < 1: print "Info: ", "Pre-processing doesn't been done."; return
+        if self.status > 1: print "Info: ", "Data sets dividing has been done."; return
 
         # get raw price data
-        tDelta   = timedelta(days=35)
+        oneDay   = timedelta(days=1)
+        tDelta   = oneDay*35
         rawSDate = self.modelSDate-tDelta
         rawEDate = self.modelEDate
         raw      = self.dataManager.indexesHSIDailyQueryByDate(rawSDate, rawEDate)
@@ -143,7 +148,6 @@ class HSIDailyTrendNNManager:
         ana      = self.dataManager.indexesHSIDailyAnaQueryByDate(anaSDate, anaEDate)
 
         # label data
-        oneDay = timedelta(days=1)
         CC1 = zip(list(ana['date']), list(ana['close_change_1d']))
         CCp = [item[1] for item in CC1 if item[1] > 0]; CCp.sort();
         CCn = [item[1] for item in CC1 if item[1] < 0]; CCn.sort();
@@ -190,6 +194,74 @@ class HSIDailyTrendNNManager:
 
         # set status level 2, data set divided
         self.status = 2
+
+    def trainingModel(self):
+
+        print "Info: ", "%s, training model" % self.name
+
+        if self.status < 2: print "Info: ", "[E]Data Set dividing doesn't been done."; return
+        if self.status > 2: print "Info: ", "Model training has been done."; return
+
+        X       = tf.placeholder(tf.float32, [None, 75])
+        y_      = tf.placeholder(tf.float32, [None, 5 ])
+        weights = tf.Variable(tf.zeros([75, 5]))
+        bias    = tf.Variable(tf.zeros([5]))
+        y       = tf.nn.softmax(tf.matmul(X, weights) + bias)
+        cross_entropy = tf.reduce_mean(-tf.reduce_sum(y_ * tf.log(y),reduction_indices=[1]))
+        train_step    = tf.train.GradientDescentOptimizer(0.5).minimize(cross_entropy)
+
+        init    = tf.initialize_all_variables()
+        sess    = tf.Session()
+        sess.run(init)
+
+        sess.run(train_step, feed_dict={X: self.Xtrain, y_: self.ytrain})
+
+        # store model
+        with sess.as_default():
+            self.model["weights"] = list([list(np.float64(item)) for item in weights.eval()])
+            self.model["bias"   ] = [np.float64(item) for item in list(bias.eval())]
+
+        correct_prediction = tf.equal(tf.argmax(y,1), tf.argmax(y_,1))
+        accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+        accuracyVal  = sess.run(accuracy, feed_dict={X: self.Xval, y_: self.yval})
+        accuracyTest = sess.run(accuracy, feed_dict={X: self.Xtest, y_: self.ytest})
+
+        with sess.as_default():
+            self.model["accuracyVal" ] = np.float64(accuracyVal)
+            self.model["accuracyTest"] = np.float64(accuracyTest)
+
+        print "Info: ", "Model Accuracy on CV %s and on test %s" % \
+                (str(self.model["accuracyVal"]), str(self.model["accuracyTest"]))
+
+        # set status level 3, trained
+        self.status = 3
+
+    def evaluate(self):
+
+        print "Info: ", "%s, evaluate model" % self.name
+
+        if self.status < 3: print "Info: ", "[E]Model training doesn't been done."; return
+
+        X       = tf.placeholder(tf.float32, [None, 75])
+        y_      = tf.placeholder(tf.float32, [None, 5 ])
+        weights = tf.Variable(self.model["weights"])
+        bias    = tf.Variable(self.model["bias"])
+        y       = tf.nn.softmax(tf.matmul(X, weights) + bias)
+        init    = tf.initialize_all_variables()
+        sess    = tf.Session()
+        sess.run(init)
+
+        correct_prediction = tf.equal(tf.argmax(y,1), tf.argmax(y_,1))
+        accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+        accuracyVal  = sess.run(accuracy, feed_dict={X: self.Xval, y_: self.yval})
+        accuracyTest = sess.run(accuracy, feed_dict={X: self.Xtest, y_: self.ytest})
+
+        with sess.as_default():
+            self.model["accuracyVal" ] = np.float64(accuracyVal)
+            self.model["accuracyTest"] = np.float64(accuracyTest)
+
+        print "Info: ", "Model Accuracy on CV %s and on test %s" % \
+                (str(self.model["accuracyVal"]), str(self.model["accuracyTest"]))
 
     def clearModel(self):
 

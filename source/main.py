@@ -5,12 +5,14 @@ if __name__ == "__main__":
 
     app = FANNS()
 
-    modelSDate = datetime.strptime('2015-05-01' , '%Y-%m-%d')
-    modelEDate = datetime.strptime('2016-04-30' , '%Y-%m-%d')
+    modelSDate = '2015-05-11'
+    modelEDate = '2016-05-10'
     #app.funcsAgent.dataManager.indexesHSIDailyLoadStaticFile()
     #app.funcsAgent.dataManager.indexesHSIDailyQueryByDate(modelSDate, modelEDate)
 
-    app.funcsAgent.machines.HSIDailyTrendNNSubManager.setManager(modelSDate=modelSDate, modelEDate=modelEDate)
+    input_status = raw_input("Input: Main.py set status level: ")
+    if input_status == '' : input_status = 2
+    app.funcsAgent.machines.HSIDailyTrendNNSubManager.setManager(modelSDate=modelSDate, modelEDate=modelEDate, status=int(input_status))
     app.funcsAgent.machines.HSIDailyTrendNNSubManager.process()
 
     app.funcsAgent.saveConfig()

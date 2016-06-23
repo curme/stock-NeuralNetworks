@@ -8,6 +8,8 @@ class DataManager:
 
     def __init__(self):
 
+        print "Info: ", "Create empty Data Manager"
+
         self.conn   = None
         self.cursor = None
         self.path   = ""
@@ -20,6 +22,8 @@ class DataManager:
         self.indexesManager = IndexesManager()
 
     def setManager(self, path, db_host, db_username, db_password):
+
+        print "Info: ", "Set Data Manager"
 
         # set data manager path
         self.path = path
@@ -61,6 +65,8 @@ class DataManager:
 
     # check if all databases are in the host
     def checkDBs(self):
+
+        print "Info: ", "Check Databases"
 
         if self.cursor == None or not self.errStatus == 0: return
 

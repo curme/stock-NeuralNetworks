@@ -8,6 +8,8 @@ class IndexesManager:
         Create an empty Indexes database manager
         """
 
+        print "Info: ", "Create empty Database Indexes Sub Data Manager"
+
         self.filepath   = ""
         self.tablepath  = ""
         self.cursor     = None
@@ -15,12 +17,16 @@ class IndexesManager:
 
     def setManager(self, filepath, tablepath, conn, cursor):
 
+        print "Info: ", "Set Database Indexes Sub Data Manager"
+
         self.filepath   = filepath
         self.tablepath  = tablepath
         self.conn       = conn
         self.cursor     = cursor
 
     def checkTables(self):
+
+        print "Info: ", "Check tables for database Indexes"
 
         # build all of the tables
         all_tables = os.listdir(self.tablepath)
@@ -32,6 +38,8 @@ class IndexesManager:
             self.conn.commit()
 
     def loadHSIDailyFromFile(self):
+
+        print "Info: ", "Load HSI Daily Data from static file"
 
         HSIDaily = None
         with file(self.filepath+'HSIDaily.csv', 'r+') as f:
@@ -50,10 +58,15 @@ class IndexesManager:
         self.cursor.execute(sql)
         self.conn.commit()
 
+        print "Info: Check tables for database Indexes"
+
     def queryHSIDaily(self, startdate, enddate):
 
         startdate  = startdate.strftime('%Y-%m-%d')
         enddate    =   enddate.strftime('%Y-%m-%d')
+
+        print "Info: ", "Query Indexes.HSIDaily data from %s to %s" % (startdate, enddate)
+
         conditions = "date >= '%s' AND date <= '%s'" % (startdate, enddate)
         result = self.queryInDataFrame("Indexes", "HSIDaily", conditions)
         return result
@@ -62,6 +75,9 @@ class IndexesManager:
 
         startdate  = startdate.strftime('%Y-%m-%d')
         enddate    =   enddate.strftime('%Y-%m-%d')
+
+        print "Info: ", "Query Indexes.HSIDailyAna data from %s to %s" % (startdate, enddate)
+
         conditions = "date >= '%s' AND date <= '%s'" % (startdate, enddate)
         result = self.queryInDataFrame("Indexes", "HSIDailyAna", conditions)
         return result
@@ -74,6 +90,8 @@ class IndexesManager:
         datelist.sort()
         startdate= datelist[ 0].strftime('%Y-%m-%d')
         enddate  = datelist[-1].strftime('%Y-%m-%d')
+
+        print "Info: ", "Store Indexes.HSIDailyAna data from %s to %s" % (startdate, enddate)
 
         sql = "DELETE FROM Indexes.HSIDailyAna WHERE date>='%s' and date<='%s';" % (startdate, enddate)
         self.cursor.execute(sql)
