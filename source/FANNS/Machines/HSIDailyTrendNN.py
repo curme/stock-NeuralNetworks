@@ -66,7 +66,8 @@ class HSIDailyTrendNNManager:
 
         self.preprocessData()
         self.divideDataSet()
-        self.trainingModel()
+        print self.Xtrain[0]
+        #self.trainingModel()
         #self.evaluate()
 
     # data processing
@@ -168,6 +169,13 @@ class HSIDailyTrendNNManager:
             elif change <  D  : y.append([0.0,0.0,0.0,1.0,0.0])   # for D
             elif change <= DD : y.append([0.0,0.0,0.0,0.0,1.0])   # for DD
             else :              y.append([0.0,0.0,1.0,0.0,0.0])   # for F
+
+        X       = np.array(X)
+        hl      = [(max(list(X[:,i])), min(list(X[:,i]))) for i in range(len(X[0]))]
+        for row in X:
+            for i in range(len(row)):
+                row[i] = (row[i]-hl[i][1])/(hl[i][0]-hl[i][1])*2-1
+        X       = list([list(row) for row in X])
 
         # divide data into training data, cross validation data and test data
         dataLength  = len(y)
