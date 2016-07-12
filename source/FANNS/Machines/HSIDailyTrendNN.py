@@ -15,23 +15,29 @@ class HSIDailyTrendNNManager:
         self.model       = {}
         self.status      = 0    # 0 for nothing done; 1 for data processed
         self.dataManager = None
+        self.evaluator   = None
+        self.labels      = None
         self.Xtrain      = None
         self.ytrain      = None
+        self.ytrainPre   = None
         self.Xval        = None
         self.yval        = None
+        self.yvalPre     = None
         self.Xtest       = None
         self.ytest       = None
+        self.ytestPre    = None
         self.modelSDate  = None
         self.modelEDate  = None
 
         print "Info: ", self.name
 
-    def setManager(self, dataManager = None, modelSDate = None, \
-                         modelEDate  = None, status     = None, \
-                         Xtrain      = None, ytrain     = None, \
-                         Xval        = None, yval       = None, \
-                         Xtest       = None, ytest      = None, \
-                         model       = None):
+    def setManager(self, dataManager = None, evaluator  = None, \
+                         modelSDate  = None, modelEDate = None, \
+                         status      = None, Xtrain     = None, \
+                         ytrain      = None, Xval       = None, \
+                         yval        = None, Xtest      = None, \
+                         ytest       = None, model      = None, \
+                         labels      = None):
 
         print "Info: ", "Set %s" % self.name
 
@@ -40,7 +46,9 @@ class HSIDailyTrendNNManager:
         dtos = lambda date  : date.strftime('%Y-%m-%d')
 
         if not dataManager == None : self.dataManager = dataManager
+        if not evaluator   == None : self.evaluator   = evaluator
         if not status      == None : self.status      = status
+        if not labels      == None : self.labels      = labels
         if not Xtrain      == None : self.Xtrain      = ltoa(Xtrain)
         if not ytrain      == None : self.ytrain      = ltoa(ytrain)
         if not Xval        == None : self.Xval        = ltoa(Xval)
@@ -66,9 +74,8 @@ class HSIDailyTrendNNManager:
 
         self.preprocessData()
         self.divideDataSet()
-        print self.Xtrain[0]
-        #self.trainingModel()
-        #self.evaluate()
+        self.trainingModel()
+        self.evaluate()
 
     # data processing
     def preprocessData(self):
@@ -76,7 +83,7 @@ class HSIDailyTrendNNManager:
         print "Info: ", "%s, pre process data" % self.name
 
         # if the data has been processed, skip processing
-        if self.status > 0: print "Info: ", "Pre-processing has been done."; return
+        if self.status > 0: print "Info: ", "Pre-processing has been done"; return
 
         # get raw price data
         oneDay   = timedelta(days=1)
@@ -133,8 +140,8 @@ class HSIDailyTrendNNManager:
 
         print "Info: ", "%s, divide data sets" % self.name
 
-        if self.status < 1: print "Info: ", "Pre-processing doesn't been done."; return
-        if self.status > 1: print "Info: ", "Data sets dividing has been done."; return
+        if self.status < 1: print "Info: ", "Pre-processing doesn't been done"; return
+        if self.status > 1: print "Info: ", "Data sets dividing has been done"; return
 
         # get raw price data
         oneDay   = timedelta(days=1)
@@ -149,27 +156,26 @@ class HSIDailyTrendNNManager:
         ana      = self.dataManager.indexesHSIDailyAnaQueryByDate(anaSDate, anaEDate)
 
         # label data
+        self.labels = ['U', 'F', 'D']
         CC1 = zip(list(ana['date']), list(ana['close_change_1d']))
         CCp = [item[1] for item in CC1 if item[1] > 0]; CCp.sort();
         CCn = [item[1] for item in CC1 if item[1] < 0]; CCn.sort();
-        DU  = CCp[int(len(CCp)*0.9)]
-        U   = CCp[int(len(CCp)*0.5)]
-        D   = CCn[int(len(CCn)*0.5)]
-        DD  = CCn[int(len(CCn)*0.1)]
+        U   = CCp[int(len(CCp)*0.33)]
+        D   = CCn[int(len(CCn)*0.66)]
         X,y = [], []
 
         for date, change in CC1:
             Xitem, i = [], 1
-            while len(Xitem) < 15*5:
+            while len(Xitem) < 15*1:
                 row, i  =  raw.loc[raw.date==(date-oneDay*i)], i+1
-                if not row.empty: Xitem+=list(row[['open','high','low','close','volume']].min())
+                # if not row.empty: Xitem+=list(row[['open','high','low','close','volume']].min())
+                if not row.empty: Xitem+=list(row[['close']].min())
             X.append(Xitem)
-            if   change >= DU : y.append([1.0,0.0,0.0,0.0,0.0])   # for DU
-            elif change >  U  : y.append([0.0,1.0,0.0,0.0,0.0])   # for U
-            elif change <  D  : y.append([0.0,0.0,0.0,1.0,0.0])   # for D
-            elif change <= DD : y.append([0.0,0.0,0.0,0.0,1.0])   # for DD
-            else :              y.append([0.0,0.0,1.0,0.0,0.0])   # for F
+            if   change >  U  : y.append([1.0,0.0,0.0])   # for U
+            elif change <  D  : y.append([0.0,0.0,1.0])   # for D
+            else :              y.append([0.0,1.0,0.0])   # for F
 
+        # range input data into [-1,1]
         X       = np.array(X)
         hl      = [(max(list(X[:,i])), min(list(X[:,i]))) for i in range(len(X[0]))]
         for row in X:
@@ -179,7 +185,7 @@ class HSIDailyTrendNNManager:
 
         # divide data into training data, cross validation data and test data
         dataLength  = len(y)
-        XvalLength  = int(dataLength*0.2)
+        XvalLength  = int(dataLength*0)
         XtestLength = int(dataLength*0.2)
         XtrainLength= dataLength-XvalLength-XtestLength
         Xtrain, Xval, Xtest = [], [], []
@@ -207,39 +213,53 @@ class HSIDailyTrendNNManager:
 
         print "Info: ", "%s, training model" % self.name
 
-        if self.status < 2: print "Info: ", "[E]Data Set dividing doesn't been done."; return
-        if self.status > 2: print "Info: ", "Model training has been done."; return
+        if self.status < 2: print "Info: ", "[E]Data Set dividing doesn't been done"; return
+        if self.status > 2: print "Info: ", "Model training has been done"; return
 
-        X       = tf.placeholder(tf.float32, [None, 75])
-        y_      = tf.placeholder(tf.float32, [None, 5 ])
-        weights = tf.Variable(tf.zeros([75, 5]))
-        bias    = tf.Variable(tf.zeros([5]))
-        y       = tf.nn.softmax(tf.matmul(X, weights) + bias)
-        cross_entropy = tf.reduce_mean(-tf.reduce_sum(y_ * tf.log(y),reduction_indices=[1]))
-        train_step    = tf.train.GradientDescentOptimizer(0.5).minimize(cross_entropy)
+        # parameters
+        inputNeurons    = len(self.Xtrain[0])
+        outputNeurons   = len(self.ytrain[0])
+        hiddenNeurons   = 50
+        learningRate    = 0.01
+        learningTimes   = int(raw_input("Input: Learning times: "))
+
+        # data placeholder
+        X       = tf.placeholder(tf.float32, [None, inputNeurons ])
+        y_      = tf.placeholder(tf.float32, [None, outputNeurons])
+
+        # hidden layer 1
+        weights0= tf.Variable(tf.random_normal([inputNeurons, hiddenNeurons]))
+        bias0   = tf.Variable(tf.random_normal([hiddenNeurons]))
+        a1      = tf.nn.sigmoid(tf.add(tf.matmul(X,  weights0), bias0))
+
+        # hidden layer 2
+        weights1= tf.Variable(tf.random_normal([hiddenNeurons, hiddenNeurons]))
+        bias1   = tf.Variable(tf.random_normal([hiddenNeurons]))
+        a2      = tf.nn.sigmoid(tf.add(tf.matmul(a1, weights1), bias1))
+
+        # output layer
+        weights2= tf.Variable(tf.random_normal([hiddenNeurons, outputNeurons]))
+        bias2   = tf.Variable(tf.random_normal([outputNeurons]))
+        y       = tf.nn.softmax(tf.add(tf.matmul(a2, weights2), bias2))
+
+        cross_entropy = tf.reduce_mean(tf.reduce_sum(-(y_) * tf.log(y) - (1-y_) * tf.log(1-y), reduction_indices=[1]))
+        train_step    = tf.train.AdamOptimizer(learningRate).minimize(cross_entropy)
 
         init    = tf.initialize_all_variables()
         sess    = tf.Session()
         sess.run(init)
 
-        sess.run(train_step, feed_dict={X: self.Xtrain, y_: self.ytrain})
+        # training
+        for _ in range(learningTimes): sess.run(train_step, feed_dict={X: self.Xtrain, y_: self.ytrain})
 
-        # store model
-        with sess.as_default():
-            self.model["weights"] = list([list(np.float64(item)) for item in weights.eval()])
-            self.model["bias"   ] = [np.float64(item) for item in list(bias.eval())]
+        # do predict after train
+        getLabel = lambda classNumber: [0.0]*classNumber + [1.0] + [0.0]*(outputNeurons-classNumber-1)
+        self.ytrainPre = [getLabel(item) for item in sess.run(tf.argmax(y,1), feed_dict={X: self.Xtrain})]
+        # self.yvalPre   = [getLabel(item) for item in sess.run(tf.argmax(y,1), feed_dict={X: self.Xval  })]
+        self.ytestPre  = [getLabel(item) for item in sess.run(tf.argmax(y,1), feed_dict={X: self.Xtest })]
 
-        correct_prediction = tf.equal(tf.argmax(y,1), tf.argmax(y_,1))
-        accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-        accuracyVal  = sess.run(accuracy, feed_dict={X: self.Xval, y_: self.yval})
-        accuracyTest = sess.run(accuracy, feed_dict={X: self.Xtest, y_: self.ytest})
-
-        with sess.as_default():
-            self.model["accuracyVal" ] = np.float64(accuracyVal)
-            self.model["accuracyTest"] = np.float64(accuracyTest)
-
-        print "Info: ", "Model Accuracy on CV %s and on test %s" % \
-                (str(self.model["accuracyVal"]), str(self.model["accuracyTest"]))
+        # close session
+        sess.close()
 
         # set status level 3, trained
         self.status = 3
@@ -248,28 +268,12 @@ class HSIDailyTrendNNManager:
 
         print "Info: ", "%s, evaluate model" % self.name
 
-        if self.status < 3: print "Info: ", "[E]Model training doesn't been done."; return
+        if self.status < 3: print "Info: ", "[E]Model training doesn't been done"; return
 
-        X       = tf.placeholder(tf.float32, [None, 75])
-        y_      = tf.placeholder(tf.float32, [None, 5 ])
-        weights = tf.Variable(self.model["weights"])
-        bias    = tf.Variable(self.model["bias"])
-        y       = tf.nn.softmax(tf.matmul(X, weights) + bias)
-        init    = tf.initialize_all_variables()
-        sess    = tf.Session()
-        sess.run(init)
+        trainAccuracy, trainRecall, trainPrecise  = self.evaluator.eval(predict = self.ytrainPre, correct = self.ytrain, labels=self.labels, dataSet="train")
+        # valAccuracy  , valRecall  , valPrecise    = self.evaluator.eval(predict = self.yvalPre  , correct = self.yval  , labels=self.labels, dataSet="cross validation")
+        testAccuracy , testRecall , testPrecise   = self.evaluator.eval(predict = self.ytestPre , correct = self.ytest , labels=self.labels, dataSet="test")
 
-        correct_prediction = tf.equal(tf.argmax(y,1), tf.argmax(y_,1))
-        accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-        accuracyVal  = sess.run(accuracy, feed_dict={X: self.Xval, y_: self.yval})
-        accuracyTest = sess.run(accuracy, feed_dict={X: self.Xtest, y_: self.ytest})
-
-        with sess.as_default():
-            self.model["accuracyVal" ] = np.float64(accuracyVal)
-            self.model["accuracyTest"] = np.float64(accuracyTest)
-
-        print "Info: ", "Model Accuracy on CV %s and on test %s" % \
-                (str(self.model["accuracyVal"]), str(self.model["accuracyTest"]))
 
     def clearModel(self):
 

@@ -13,7 +13,7 @@ class IndexesManager:
         self.filepath   = ""
         self.tablepath  = ""
         self.cursor     = None
-        self.comm       = None
+        self.conn       = None
 
     def setManager(self, filepath, tablepath, conn, cursor):
 
@@ -30,7 +30,7 @@ class IndexesManager:
 
         # build all of the tables
         all_tables = os.listdir(self.tablepath)
-        indexes_tables = [t for t in all_tables if t.split('_')[0]=="Indexes"]
+        indexes_tables = [t for t in all_tables if t.split('.')[0]=="Indexes"]
         for table in indexes_tables:
             sql_file = file(self.tablepath + table)
             sql      = sql_file.read()
@@ -57,8 +57,6 @@ class IndexesManager:
 
         self.cursor.execute(sql)
         self.conn.commit()
-
-        print "Info: Check tables for database Indexes"
 
     def queryHSIDaily(self, startdate, enddate):
 

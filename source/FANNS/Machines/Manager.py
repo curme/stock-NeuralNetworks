@@ -1,4 +1,6 @@
-from HSIDailyTrendNN import HSIDailyTrendNNManager
+from . import Evaluator
+from HSIDailyTrendNN                import HSIDailyTrendNNManager
+from HSIFutureHalfHourTrendLSTMNN   import HSIFutureHalfHourTrendLSTMNNManager
 
 class MachinesManager:
 
@@ -6,7 +8,10 @@ class MachinesManager:
 
         print "Info: ", "Create empty Machines manager"
 
+        self.dataManager = None
+        self.evaluator   = Evaluator()
         self.HSIDailyTrendNNSubManager = HSIDailyTrendNNManager()
+        self.HSIFutureHalfHourTrendLSTMNNSubManager = HSIFutureHalfHourTrendLSTMNNManager()
 
     def setManager(self, dataManager, machineConfig):
 
@@ -18,6 +23,8 @@ class MachinesManager:
         HSIDailyTrendNNConfig = machineConfig['HSIDailyTrendNN']
         self.HSIDailyTrendNNSubManager.setManager( \
             dataManager = self.dataManager, \
+            evaluator   = self.evaluator,   \
+            labels      = HSIDailyTrendNNConfig["labels"],     \
             modelSDate  = HSIDailyTrendNNConfig["modelSDate"], \
             modelEDate  = HSIDailyTrendNNConfig["modelEDate"], \
             status = HSIDailyTrendNNConfig["status"], \
@@ -28,3 +35,8 @@ class MachinesManager:
             Xtest  = HSIDailyTrendNNConfig["Xtest"],  \
             ytest  = HSIDailyTrendNNConfig["ytest"],  \
             model  = HSIDailyTrendNNConfig["model"])
+
+        # set HSI Futures Half Hour Trend Predict LSTM NN
+        self.HSIFutureHalfHourTrendLSTMNNSubManager.setManager(\
+            dataManager = self.dataManager, \
+            evaluator   = self.evaluator)

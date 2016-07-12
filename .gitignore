@@ -89,6 +89,7 @@ DerivedData
 *.xls
 *.xlsx
 *.ppt
+*.csv
 
 # configure #
 #############

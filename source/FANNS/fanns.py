@@ -66,6 +66,8 @@ class FANNS:
             # save HSIDailyTrendNN config
             config["stash"]["machines"]["HSIDailyTrendNN"]["status"] = \
                 self.machines.HSIDailyTrendNNSubManager.status
+            config["stash"]["machines"]["HSIDailyTrendNN"]["labels"] = \
+                self.machines.HSIDailyTrendNNSubManager.labels
             config["stash"]["machines"]["HSIDailyTrendNN"]["Xtrain"] = \
                 atol(self.machines.HSIDailyTrendNNSubManager.Xtrain)
             config["stash"]["machines"]["HSIDailyTrendNN"]["ytrain"] = \
